@@ -92,4 +92,29 @@ class PantryProvider with ChangeNotifier {
   Future<void> deleteProduct(String id) async {
     await _db.collection(_collection).doc(id).delete();
   }
+
+  // Sposta tutti i prodotti spuntati nella dispensa
+  Future<void> moveCheckedToPantry() async {
+    if (_userId.isEmpty) return;
+
+    // 1. Cerca su Firebase tutti i prodotti di questo utente che hanno la spunta
+    final querySnapshot = await _db.collection(_collection)
+        .where('userId', isEqualTo: _userId)
+        .where('isChecked', isEqualTo: true)
+        .get();
+
+    // 2. Usiamo un "WriteBatch" per aggiornarli tutti insieme in un colpo solo
+    // (È molto più veloce e sicuro rispetto ad aggiornarli uno per volta)
+    final batch = _db.batch();
+
+    for (var doc in querySnapshot.docs) {
+      batch.update(doc.reference, {
+        'stato': ProductStatus.in_dispensa.toString(), // Li mandiamo in dispensa
+        'isChecked': false,                            // Togliamo la spunta
+      });
+    }
+
+    // 3. Eseguiamo il salvataggio di massa!
+    await batch.commit();
+  }
 }

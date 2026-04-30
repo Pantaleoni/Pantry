@@ -1,62 +1,104 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/pantry.dart';
+import '../models/product.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<PantryProvider>();
-    final inScadenza = provider.inScadenzaOggi;
-    final spesaSettimanale = provider.listaSettimanale;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 80),
-        children: [
-          _buildSectionHeader('In Scadenza a Breve', Icons.warning_rounded, Colors.redAccent),
-          if (inScadenza.isEmpty) _buildEmptyState('Nessun prodotto in scadenza!', Icons.check_circle_outline, Colors.green)
-          else ...inScadenza.map((p) => Card(
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: p.colorCode.withOpacity(0.1), shape: BoxShape.circle), child: Icon(Icons.timer, color: p.colorCode)),
-              title: Text(p.nome, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text("Quantità residua: ${p.quantita}"),
-              trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-            ),
-          )),
-          const SizedBox(height: 24),
-          _buildSectionHeader('Cosa manca (Spesa Rapida)', Icons.shopping_basket_rounded, Colors.blueAccent),
-          if (spesaSettimanale.isEmpty) _buildEmptyState('Lista spesa vuota.', Icons.shopping_cart_outlined, Colors.grey)
-          else ...spesaSettimanale.take(3).map((p) => Card(
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              leading: const Icon(Icons.radio_button_unchecked, color: Colors.grey),
-              title: Text(p.nome, style: const TextStyle(fontWeight: FontWeight.w500)),
-            ),
-          )),
-        ],
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: const Text('Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: StreamBuilder<List<Product>>(
+        stream: context.read<PantryProvider>().prodottiInDispensa,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final allProducts = snapshot.data ?? [];
+
+          // Calcolo scadenze
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+
+          final inScadenza = allProducts.where((p) {
+            if (p.dataScadenza == null) return false;
+            final expiry = DateTime(p.dataScadenza!.year, p.dataScadenza!.month, p.dataScadenza!.day);
+            final diff = expiry.difference(today).inDays;
+            return diff >= 0 && diff <= 5; // Avvisa 5 giorni prima
+          }).toList();
+
+          // Ordina per scadenza più vicina
+          inScadenza.sort((a, b) => a.dataScadenza!.compareTo(b.dataScadenza!));
+
+          return ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              // --- WIDGET RIEPILOGO ---
+              Card(
+                elevation: 4,
+                shadowColor: Colors.green.withOpacity(0.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatColumn('In Dispensa', '${allProducts.length}', Colors.green),
+                      Container(width: 1, height: 40, color: Colors.grey[300]),
+                      _buildStatColumn('In Scadenza', '${inScadenza.length}', Colors.orange),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // --- SEZIONE SCADENZE ---
+              Text('In scadenza a breve ⚠️', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+
+              if (inScadenza.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(20.0),
+                  child: Center(child: Text('Nessun prodotto in scadenza! 🎉', style: TextStyle(color: Colors.grey, fontSize: 16))),
+                )
+              else
+                ...inScadenza.map((prodotto) {
+                  final diff = prodotto.dataScadenza!.difference(today).inDays;
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: prodotto.colorCode.withOpacity(0.2),
+                        child: Icon(Icons.warning_amber_rounded, color: prodotto.colorCode),
+                      ),
+                      title: Text(prodotto.nome, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(diff == 0 ? 'Scade OGGI!' : 'Scade tra $diff giorni'),
+                      trailing: Text('${prodotto.quantita} pz', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  );
+                }),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Row(children: [Icon(icon, color: color, size: 28), const SizedBox(width: 12), Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: -0.5))]),
-    );
-  }
-
-  Widget _buildEmptyState(String message, IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
-        child: Column(children: [Icon(icon, size: 48, color: color.withOpacity(0.5)), const SizedBox(height: 12), Text(message, style: TextStyle(color: Colors.grey.shade600, fontSize: 16))]),
-      ),
+  Widget _buildStatColumn(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: color)),
+        Text(label, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+      ],
     );
   }
 }

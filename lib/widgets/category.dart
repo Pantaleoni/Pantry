@@ -34,9 +34,21 @@ class CategoryList extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Prodotto Finito'), content: Text('Vuoi aggiungere "${product.nome}" alla lista?'),
         actions: [
-          TextButton(onPressed: () { context.read<PantryProvider>().deleteProduct(product); Navigator.pop(ctx); }, child: const Text('No, elimina', style: TextStyle(color: Colors.grey))),
-          TextButton(onPressed: () { context.read<PantryProvider>().changeStatus(product, ProductStatus.in_lista_straordinaria); Navigator.pop(ctx); }, child: const Text('Straordinaria')),
-          FilledButton(onPressed: () { context.read<PantryProvider>().changeStatus(product, ProductStatus.in_lista_settimanale); Navigator.pop(ctx); }, child: const Text('Settimanale')),
+          TextButton(onPressed: () { context.read<PantryProvider>().deleteProduct(product.id); Navigator.pop(ctx); }, child: const Text('No, elimina', style: TextStyle(color: Colors.grey))),
+          TextButton(
+              onPressed: () {
+                context.read<PantryProvider>().updateProductStatus(product.id, ProductStatus.in_lista_straordinaria);
+                Navigator.pop(ctx);
+              },
+              child: const Text('Straordinaria')
+          ),
+          FilledButton(
+              onPressed: () {
+                context.read<PantryProvider>().updateProductStatus(product.id, ProductStatus.in_lista_settimanale);
+                Navigator.pop(ctx);
+              },
+              child: const Text('Settimanale')
+          ),
         ],
       ),
     );

@@ -117,4 +117,12 @@ class PantryProvider with ChangeNotifier {
     // 3. Eseguiamo il salvataggio di massa!
     await batch.commit();
   }
+
+  Future<void> updateProductName(String id, String newName) async {
+    await _db.collection(_collection).doc(id).update({'nome': newName});
+  }
+
+  Future<void> updateProductDate(String id, DateTime newDate) async {
+    await _db.collection(_collection).doc(id).update({'dataScadenza': newDate});
+  }
 }

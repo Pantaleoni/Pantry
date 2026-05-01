@@ -1,46 +1,61 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // <-- Necessario per il Timestamp di Firebase
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum ProductStatus { in_dispensa, in_lista_settimanale, in_lista_straordinaria }
 
 class Product {
   final String id;
   final String barcode;
+  final String categoria; // Es: 'Frigo', 'Freezer', 'Dispensa', 'Altro'
   String nome;
-  String categoria;
   DateTime? dataScadenza;
   ProductStatus stato;
   int quantita;
   bool isChecked;
-  String userId; // <-- NUOVO: fondamentale per dividere le dispense!
+  String userId;
 
   Product({
     required this.id,
     required this.barcode,
     required this.nome,
     required this.categoria,
+    required this.userId,
     this.dataScadenza,
     this.stato = ProductStatus.in_dispensa,
     this.quantita = 1,
     this.isChecked = false,
-    required this.userId, // <-- Obbligatorio ora
   });
 
   // Da Firestore all'App (Lettura)
   factory Product.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> map = doc.data() as Map<String, dynamic>;
 
-    // Gestione sicura della data da Firestore (Timestamp -> DateTime)
+    // --- NUOVO SISTEMA AUTOMATICO SALVA-CRASH PER LA DATA ---
     DateTime? scadenza;
-    if (map['dataScadenza'] != null) {
-      scadenza = (map['dataScadenza'] as Timestamp).toDate();
+    var dataDalDb = map['dataScadenza'];
+
+    if (dataDalDb != null) {
+      if (dataDalDb is String) {
+        // Se trova il vecchio errore (testo), lo converte da solo in automatico!
+        scadenza = DateTime.tryParse(dataDalDb);
+      } else if (dataDalDb is Timestamp) {
+        // Se è il formato corretto di Firebase, usa il suo metodo nativo
+        scadenza = dataDalDb.toDate();
+      } else {
+        // Ultimo tentativo di salvataggio per casistiche strane
+        try {
+          scadenza = (dataDalDb as Timestamp).toDate();
+        } catch (e) {
+          scadenza = null; // Non crasha, al massimo mette "Senza scadenza"
+        }
+      }
     }
 
     return Product(
       id: doc.id, // L'ID del documento assegnato da Firebase
       barcode: map['barcode'] ?? '',
       nome: map['nome'] ?? '',
-      categoria: map['categoria'] ?? 'Dispensa',
+      categoria: map['categoria'] ?? 'Altro', // 'Altro' come default più sicuro
       dataScadenza: scadenza,
       stato: ProductStatus.values.firstWhere(
               (e) => e.toString() == map['stato'],
@@ -58,7 +73,6 @@ class Product {
       'barcode': barcode,
       'nome': nome,
       'categoria': categoria,
-      // Firestore gestisce meglio le date se usiamo il suo Timestamp
       'dataScadenza': dataScadenza != null ? Timestamp.fromDate(dataScadenza!) : null,
       'stato': stato.toString(),
       'quantita': quantita,

@@ -3,7 +3,6 @@ import 'dashboard.dart';
 import 'dispensa.dart';
 import 'liste_spesa.dart';
 import 'settings.dart';
-import '../widgets/scanner.dart';
 
 class MainNavigator extends StatefulWidget {
   const MainNavigator({super.key});
@@ -28,10 +27,6 @@ class _MainNavigatorState extends State<MainNavigator> {
           NavigationDestination(icon: Icon(Icons.shopping_cart), label: 'Spesa'),
           NavigationDestination(icon: Icon(Icons.settings), label: 'Impostazioni'),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showModalBottomSheet(context: context, builder: (_) => const ScannerAndFormModal()),
-        child: const Icon(Icons.add),
       ),
     );
   }

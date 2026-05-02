@@ -45,7 +45,7 @@ class PantryProvider with ChangeNotifier {
   Future<void> addProduct({
     required String nome,
     String barcode = '',
-    String categoria = 'Altro',
+    String categoria = 'Altro', // <-- Riceve perfettamente la categoria dallo scanner!
     int quantita = 1,
     DateTime? scadenza,
     ProductStatus stato = ProductStatus.in_dispensa,
@@ -124,5 +124,12 @@ class PantryProvider with ChangeNotifier {
 
   Future<void> updateProductDate(String id, DateTime newDate) async {
     await _db.collection(_collection).doc(id).update({'dataScadenza': newDate});
+  }
+
+  // --- FUNZIONE NUOVA AGGIUNTA ---
+  // Tornerà molto utile se vorrai permettere di modificare la categoria
+  // di un prodotto cliccandoci sopra (come fai già con nome e data!)
+  Future<void> updateProductCategory(String id, String newCategory) async {
+    await _db.collection(_collection).doc(id).update({'categoria': newCategory});
   }
 }

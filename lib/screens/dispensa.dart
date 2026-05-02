@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/pantry.dart';
 import '../models/product.dart';
+import '../widgets/scanner.dart'; // <-- Controlla che questo percorso sia giusto!
 
 class DispensaScreen extends StatelessWidget {
   const DispensaScreen({super.key});
@@ -14,6 +15,21 @@ class DispensaScreen extends StatelessWidget {
         title: const Text('La mia Dispensa', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+      ),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'add_dispensa',
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => const ScannerAndFormModal(
+              targetStatus: ProductStatus.in_dispensa,
+            ),
+          );
+        },
+        backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
       body: StreamBuilder<List<Product>>(
         stream: context.read<PantryProvider>().prodottiInDispensa,
@@ -32,7 +48,6 @@ class DispensaScreen extends StatelessWidget {
             );
           }
 
-          // 1. DIVIDIAMO IN CATEGORIE
           final Map<String, List<Product>> groupedItems = {
             'Frigo': [],
             'Freezer': [],
@@ -41,23 +56,19 @@ class DispensaScreen extends StatelessWidget {
           };
 
           for (var p in items) {
-            // Se la categoria non è tra quelle previste, va in "Altro"
             final cat = groupedItems.containsKey(p.categoria) ? p.categoria : 'Altro';
             groupedItems[cat]!.add(p);
           }
 
-          // 2. ORDINE ALFABETICO IN OGNI CATEGORIA
           for (var list in groupedItems.values) {
             list.sort((a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()));
           }
 
-          // 3. COSTRUIAMO LA LISTA GRAFICA
           List<Widget> listWidgets = [];
 
           for (var entry in groupedItems.entries) {
-            if (entry.value.isEmpty) continue; // Salta le categorie vuote
+            if (entry.value.isEmpty) continue;
 
-            // Titolo della categoria
             listWidgets.add(
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -68,14 +79,13 @@ class DispensaScreen extends StatelessWidget {
                 )
             );
 
-            // Prodotti della categoria
             for (var p in entry.value) {
               listWidgets.add(_buildProductCard(context, p));
             }
           }
 
           return ListView(
-            padding: const EdgeInsets.only(bottom: 80), // Padding per il FAB
+            padding: const EdgeInsets.only(bottom: 80),
             children: listWidgets,
           );
         },
@@ -83,27 +93,25 @@ class DispensaScreen extends StatelessWidget {
     );
   }
 
-  // --- WIDGET DELLA SINGOLA CARTA ---
   Widget _buildProductCard(BuildContext context, Product p) {
     return Dismissible(
       key: ValueKey(p.id),
-      direction: DismissDirection.endToStart, // Trascinamento verso sinistra
+      direction: DismissDirection.endToStart,
       background: Container(
         margin: const EdgeInsets.only(bottom: 16, right: 16, left: 16),
         decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(15)),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 30),
-        child: const Icon(Icons.delete, color: Colors.white), // Icona generica visto che ci sono più opzioni
+        child: const Icon(Icons.delete, color: Colors.white),
       ),
       confirmDismiss: (direction) async {
-        // POP-UP DELLE 4 OPZIONI
         return await showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
               title: Text('Gestisci "${p.nome}"'),
               content: const Text('Cosa vuoi fare con questo prodotto?'),
               actionsAlignment: MainAxisAlignment.center,
-              actionsOverflowDirection: VerticalDirection.down, // Mette i bottoni in colonna se non ci stanno
+              actionsOverflowDirection: VerticalDirection.down,
               actions: [
                 TextButton(
                     onPressed: () => Navigator.of(ctx).pop(false),
@@ -112,7 +120,7 @@ class DispensaScreen extends StatelessWidget {
                 TextButton(
                     onPressed: () {
                       context.read<PantryProvider>().deleteProduct(p.id);
-                      Navigator.of(ctx).pop(true); // true = fai sparire la carta
+                      Navigator.of(ctx).pop(true);
                     },
                     child: const Text('Elimina', style: TextStyle(color: Colors.red))
                 ),
@@ -142,42 +150,40 @@ class DispensaScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(8.0),
           child: ListTile(
+            contentPadding: const EdgeInsets.only(left: 16.0, right: 10.0),
+
             leading: Container(
               width: 12,
               decoration: BoxDecoration(color: p.colorCode, borderRadius: BorderRadius.circular(10)),
             ),
 
-            // DOPPIO CLICK PER IL NOME
             title: GestureDetector(
               onDoubleTap: () => _editName(context, p),
               child: Text(p.nome, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
 
-            // CLICK PER LA DATA
             subtitle: InkWell(
               onTap: () => _editDate(context, p),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: Text(
-                  p.dataScadenza != null ? "Scadenza: ${p.dataScadenza!.day}/${p.dataScadenza!.month}/${p.dataScadenza!.year}" : "Nessuna scadenza (Tocca per aggiungere)",
-                  style: TextStyle(color: Colors.grey[700], decoration: TextDecoration.underline, decorationStyle: TextDecorationStyle.dotted),
+                  p.dataScadenza != null ? "Scadenza: ${p.dataScadenza!.day}/${p.dataScadenza!.month}/${p.dataScadenza!.year}" : "Nessuna scadenza",
+                  style: TextStyle(color: Colors.grey[700]),
                 ),
               ),
             ),
 
-            // TASTI QUANTITÀ
             trailing: Container(
               decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(30)),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Scompare (lasciando lo spazio intatto) se la quantità è 1
                   p.quantita > 1
                       ? IconButton(
                     icon: const Icon(Icons.remove, color: Colors.redAccent),
                     onPressed: () => context.read<PantryProvider>().updateQuantity(p.id, p.quantita - 1),
                   )
-                      : const SizedBox(width: 40), // Stessa larghezza del bottone per mantenere tutto allineato
+                      : const SizedBox(width: 40),
 
                   Text('${p.quantita}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
 
@@ -194,13 +200,12 @@ class DispensaScreen extends StatelessWidget {
     );
   }
 
-  // --- FUNZIONE PER MODIFICARE IL NOME ---
   Future<void> _editName(BuildContext context, Product p) async {
     String newName = p.nome;
     await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Modifica nome'),
+          title: const Text('Rinomina'),
           content: TextFormField(
             initialValue: p.nome,
             onChanged: (val) => newName = val,
@@ -219,7 +224,6 @@ class DispensaScreen extends StatelessWidget {
     );
   }
 
-  // --- FUNZIONE PER MODIFICARE LA DATA ---
   Future<void> _editDate(BuildContext context, Product p) async {
     final picked = await showDatePicker(
       context: context,

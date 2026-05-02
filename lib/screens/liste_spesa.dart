@@ -1,50 +1,100 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/pantry.dart'; // Assicurati che il nome del file provider sia corretto
+import '../providers/pantry.dart';
 import '../models/product.dart';
+import '../widgets/scanner.dart'; // <-- Controlla che questo percorso sia giusto!
 
-class ListeSpesaScreen extends StatelessWidget {
+class ListeSpesaScreen extends StatefulWidget {
   const ListeSpesaScreen({super.key});
 
   @override
+  State<ListeSpesaScreen> createState() => _ListeSpesaScreenState();
+}
+
+class _ListeSpesaScreenState extends State<ListeSpesaScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: Colors.grey[100],
-        appBar: AppBar(
-          title: const Text('Liste della Spesa', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.white,
-          elevation: 0,
-          bottom: const TabBar(
-            indicatorColor: Colors.green,
-            labelColor: Colors.green,
-            unselectedLabelColor: Colors.grey,
-            tabs: [
-              Tab(icon: Icon(Icons.calendar_month), text: 'Settimanale'),
-              Tab(icon: Icon(Icons.star), text: 'Straordinaria'),
-            ],
-          ),
-        ),
-        body: const TabBarView(
-          children: [
-            ShoppingListTab(status: ProductStatus.in_lista_settimanale),
-            ShoppingListTab(status: ProductStatus.in_lista_straordinaria),
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: const Text('Liste della Spesa', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.green,
+          labelColor: Colors.green,
+          unselectedLabelColor: Colors.grey,
+          tabs: const [
+            Tab(icon: Icon(Icons.calendar_month), text: 'Settimanale'),
+            Tab(icon: Icon(Icons.star), text: 'Straordinaria'),
           ],
         ),
-        // Rimetto il pulsante per svuotare i prodotti spuntati in dispensa
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            context.read<PantryProvider>().moveCheckedToPantry();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Prodotti spuntati spostati in Dispensa! 📦'), backgroundColor: Colors.green),
-            );
-          },
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.move_to_inbox),
-          label: const Text("Svuota in Dispensa"),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          ShoppingListTab(status: ProductStatus.in_lista_settimanale),
+          ShoppingListTab(status: ProductStatus.in_lista_straordinaria),
+        ],
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            FloatingActionButton(
+              heroTag: 'svuota_spesa',
+              onPressed: () {
+                context.read<PantryProvider>().moveCheckedToPantry();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text('Prodotti spuntati spostati in Dispensa! 📦'),
+                      backgroundColor: Colors.green
+                  ),
+                );
+              },
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              tooltip: 'Svuota in Dispensa',
+              child: const Icon(Icons.move_to_inbox),
+            ),
+            FloatingActionButton(
+              heroTag: 'add_spesa',
+              onPressed: () {
+                final activeStatus = _tabController.index == 0
+                    ? ProductStatus.in_lista_settimanale
+                    : ProductStatus.in_lista_straordinaria;
+
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => ScannerAndFormModal(
+                    targetStatus: activeStatus,
+                  ),
+                );
+              },
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              tooltip: 'Aggiungi Prodotto',
+              child: const Icon(Icons.add),
+            ),
+          ],
         ),
       ),
     );
@@ -76,7 +126,10 @@ class ShoppingListTab extends StatelessWidget {
           );
         }
 
-        // 1. RAGGRUPPAMENTO PER CATEGORIE
+        final int totali = items.length;
+        final int presi = items.where((p) => p.isChecked).length;
+        final int daPrendere = totali - presi;
+
         final Map<String, List<Product>> groupedItems = {
           'Frigo': [],
           'Freezer': [],
@@ -89,12 +142,37 @@ class ShoppingListTab extends StatelessWidget {
           groupedItems[cat]!.add(p);
         }
 
-        // 2. ORDINE ALFABETICO
         for (var list in groupedItems.values) {
           list.sort((a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()));
         }
 
         List<Widget> listWidgets = [];
+
+        listWidgets.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Card(
+              color: Colors.white,
+              elevation: 4,
+              shadowColor: Colors.green.withOpacity(0.2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20.0, horizontal: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildStatColumn('Totali', '$totali', Colors.blueGrey),
+                    Container(width: 1, height: 40, color: Colors.grey[300]),
+                    _buildStatColumn('Da prendere', '$daPrendere', Colors.orange),
+                    Container(width: 1, height: 40, color: Colors.grey[300]),
+                    _buildStatColumn('Presi', '$presi', Colors.green),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
         for (var entry in groupedItems.entries) {
           if (entry.value.isEmpty) continue;
 
@@ -114,10 +192,21 @@ class ShoppingListTab extends StatelessWidget {
         }
 
         return ListView(
-          padding: const EdgeInsets.only(bottom: 80, top: 8), // Padding per il FAB
+          padding: const EdgeInsets.only(bottom: 80, top: 8),
           children: listWidgets,
         );
       },
+    );
+  }
+
+  Widget _buildStatColumn(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 13)),
+        ],
+      ),
     );
   }
 
@@ -169,10 +258,10 @@ class ShoppingListTab extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         child: Padding(
-          padding: const EdgeInsets.all(8.0), // Padding identico alla Dispensa
+          padding: const EdgeInsets.all(8.0),
           child: ListTile(
+            contentPadding: const EdgeInsets.only(left: 8.0, right: 0.0),
 
-            // SPUNTA A SINISTRA
             leading: Checkbox(
               activeColor: Colors.green,
               value: p.isChecked,
@@ -181,7 +270,6 @@ class ShoppingListTab extends StatelessWidget {
               },
             ),
 
-            // NOME CON DOPPIO CLICK (Stile identico alla Dispensa)
             title: GestureDetector(
               onDoubleTap: () => _editName(context, p, provider),
               child: Text(
@@ -195,9 +283,6 @@ class ShoppingListTab extends StatelessWidget {
               ),
             ),
 
-            // NESSUNA DATA DI SCADENZA PRESENTE
-
-            // CONTROLLI QUANTITÀ (Identici alla Dispensa)
             trailing: Container(
               decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(30)),
               child: Row(
@@ -208,7 +293,7 @@ class ShoppingListTab extends StatelessWidget {
                     icon: const Icon(Icons.remove, color: Colors.redAccent),
                     onPressed: () => provider.updateQuantity(p.id, p.quantita - 1),
                   )
-                      : const SizedBox(width: 40), // Mantiene l'allineamento perfetto
+                      : const SizedBox(width: 40),
 
                   Text('${p.quantita}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
 

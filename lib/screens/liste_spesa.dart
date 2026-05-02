@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/pantry.dart';
+import '../providers/pantry.dart'; // Assicurati che il nome del file provider sia corretto
 import '../models/product.dart';
 
 class ListeSpesaScreen extends StatelessWidget {
@@ -32,6 +32,20 @@ class ListeSpesaScreen extends StatelessWidget {
             ShoppingListTab(status: ProductStatus.in_lista_straordinaria),
           ],
         ),
+        // Rimetto il pulsante per svuotare i prodotti spuntati in dispensa
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            context.read<PantryProvider>().moveCheckedToPantry();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Prodotti spuntati spostati in Dispensa! 📦'), backgroundColor: Colors.green),
+            );
+          },
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.move_to_inbox),
+          label: const Text("Svuota in Dispensa"),
+        ),
       ),
     );
   }
@@ -62,7 +76,7 @@ class ShoppingListTab extends StatelessWidget {
           );
         }
 
-        // 1. RAGGRUPPAMENTO PER CATEGORIE (Come in dispensa)
+        // 1. RAGGRUPPAMENTO PER CATEGORIE
         final Map<String, List<Product>> groupedItems = {
           'Frigo': [],
           'Freezer': [],
@@ -89,7 +103,7 @@ class ShoppingListTab extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Text(
                     entry.key.toUpperCase(),
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.1)
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)
                 ),
               )
           );
@@ -100,7 +114,7 @@ class ShoppingListTab extends StatelessWidget {
         }
 
         return ListView(
-          padding: const EdgeInsets.only(bottom: 100, top: 8),
+          padding: const EdgeInsets.only(bottom: 80, top: 8), // Padding per il FAB
           children: listWidgets,
         );
       },
@@ -108,7 +122,6 @@ class ShoppingListTab extends StatelessWidget {
   }
 
   Widget _buildShoppingCard(BuildContext context, Product p, PantryProvider provider) {
-    // Determiniamo la lista "opposta" per il tasto sposta
     final String targetLabel = status == ProductStatus.in_lista_settimanale ? "Straordinaria" : "Settimanale";
     final ProductStatus targetStatus = status == ProductStatus.in_lista_settimanale
         ? ProductStatus.in_lista_straordinaria
@@ -118,11 +131,11 @@ class ShoppingListTab extends StatelessWidget {
       key: ValueKey(p.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        margin: const EdgeInsets.only(bottom: 12, right: 16, left: 16),
         decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(15)),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.settings, color: Colors.white),
+        child: const Icon(Icons.delete, color: Colors.white),
       ),
       confirmDismiss: (direction) async {
         return await showDialog(
@@ -131,20 +144,13 @@ class ShoppingListTab extends StatelessWidget {
               title: Text('Gestisci "${p.nome}"'),
               actionsOverflowDirection: VerticalDirection.down,
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla', style: TextStyle(color: Colors.grey))),
                 TextButton(
                     onPressed: () {
                       provider.deleteProduct(p.id);
                       Navigator.pop(ctx, true);
                     },
                     child: const Text('Elimina', style: TextStyle(color: Colors.red))
-                ),
-                FilledButton.tonal(
-                    onPressed: () {
-                      provider.updateProductStatus(p.id, ProductStatus.in_dispensa);
-                      Navigator.pop(ctx, true);
-                    },
-                    child: const Text('Sposta in Dispensa')
                 ),
                 FilledButton.tonal(
                     onPressed: () {
@@ -160,57 +166,58 @@ class ShoppingListTab extends StatelessWidget {
       child: Card(
         elevation: p.isChecked ? 0 : 2,
         color: p.isChecked ? Colors.grey[200] : Colors.white,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0), // Padding identico alla Dispensa
+          child: ListTile(
 
-          // SPUNTA A SINISTRA
-          leading: Checkbox(
-            activeColor: Colors.green,
-            value: p.isChecked,
-            onChanged: (val) {
-              if (val != null) provider.toggleCheck(p.id, p.isChecked);
-            },
-          ),
-
-          // NOME CON DOPPIO CLICK (con sbarratura se selezionato)
-          title: GestureDetector(
-            onDoubleTap: () => _editName(context, p, provider),
-            child: Text(
-                p.nome,
-                style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                    decoration: p.isChecked ? TextDecoration.lineThrough : null,
-                    color: p.isChecked ? Colors.grey : Colors.black87
-                )
+            // SPUNTA A SINISTRA
+            leading: Checkbox(
+              activeColor: Colors.green,
+              value: p.isChecked,
+              onChanged: (val) {
+                if (val != null) provider.toggleCheck(p.id, p.isChecked);
+              },
             ),
-          ),
 
-          // CONTROLLI QUANTITÀ (Uguali alla dispensa)
-          trailing: Container(
-            decoration: BoxDecoration(color: p.isChecked ? Colors.grey[300] : Colors.grey[100], borderRadius: BorderRadius.circular(30)),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (p.quantita > 1)
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.remove, color: Colors.redAccent, size: 20),
+            // NOME CON DOPPIO CLICK (Stile identico alla Dispensa)
+            title: GestureDetector(
+              onDoubleTap: () => _editName(context, p, provider),
+              child: Text(
+                  p.nome,
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      decoration: p.isChecked ? TextDecoration.lineThrough : null,
+                      color: p.isChecked ? Colors.grey : Colors.black
+                  )
+              ),
+            ),
+
+            // NESSUNA DATA DI SCADENZA PRESENTE
+
+            // CONTROLLI QUANTITÀ (Identici alla Dispensa)
+            trailing: Container(
+              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(30)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  p.quantita > 1
+                      ? IconButton(
+                    icon: const Icon(Icons.remove, color: Colors.redAccent),
                     onPressed: () => provider.updateQuantity(p.id, p.quantita - 1),
                   )
-                else
-                  const SizedBox(width: 40),
+                      : const SizedBox(width: 40), // Mantiene l'allineamento perfetto
 
-                Text('${p.quantita}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text('${p.quantita}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
 
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.add, color: Colors.green, size: 20),
-                  onPressed: () => provider.updateQuantity(p.id, p.quantita + 1),
-                ),
-              ],
+                  IconButton(
+                    icon: const Icon(Icons.add, color: Colors.green),
+                    onPressed: () => provider.updateQuantity(p.id, p.quantita + 1),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

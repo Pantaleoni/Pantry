@@ -89,11 +89,11 @@ class DispensaScreen extends StatelessWidget {
       key: ValueKey(p.id),
       direction: DismissDirection.endToStart, // Trascinamento verso sinistra
       background: Container(
-        margin: const EdgeInsets.only(bottom: 12, right: 16, left: 16),
+        margin: const EdgeInsets.only(bottom: 16, right: 16, left: 16),
         decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(15)),
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.settings, color: Colors.white), // Icona generica visto che ci sono più opzioni
+        padding: const EdgeInsets.only(right: 30),
+        child: const Icon(Icons.delete, color: Colors.white), // Icona generica visto che ci sono più opzioni
       ),
       confirmDismiss: (direction) async {
         // POP-UP DELLE 4 OPZIONI
@@ -114,7 +114,7 @@ class DispensaScreen extends StatelessWidget {
                       context.read<PantryProvider>().deleteProduct(p.id);
                       Navigator.of(ctx).pop(true); // true = fai sparire la carta
                     },
-                    child: const Text('Elimina definitivamente', style: TextStyle(color: Colors.red))
+                    child: const Text('Elimina', style: TextStyle(color: Colors.red))
                 ),
                 FilledButton.tonal(
                     onPressed: () {
@@ -135,6 +135,7 @@ class DispensaScreen extends StatelessWidget {
         );
       },
       child: Card(
+        color: Colors.white,
         elevation: 2,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -176,7 +177,7 @@ class DispensaScreen extends StatelessWidget {
                     icon: const Icon(Icons.remove, color: Colors.redAccent),
                     onPressed: () => context.read<PantryProvider>().updateQuantity(p.id, p.quantita - 1),
                   )
-                      : const SizedBox(width: 48), // Stessa larghezza del bottone per mantenere tutto allineato
+                      : const SizedBox(width: 40), // Stessa larghezza del bottone per mantenere tutto allineato
 
                   Text('${p.quantita}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
 
